@@ -10,6 +10,7 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().trim().email().max(255),
   password: z.string().min(1).max(128),
+  role: z.enum(["admin", "staff", "customer"]),
 });
 
 export const googleSchema = z.object({

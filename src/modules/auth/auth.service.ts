@@ -83,7 +83,12 @@ export async function register(input: RegisterInput) {
 
 export async function login(input: LoginInput) {
   const user = await userStore.findByEmail(normalizeEmail(input.email));
-  if (!user || !user.passwordHash || !(await argon2.verify(user.passwordHash, input.password)))
+  if (
+    !user ||
+    user.role !== input.role ||
+    !user.passwordHash ||
+    !(await argon2.verify(user.passwordHash, input.password))
+  )
     throw new AppError("Invalid email or password.", 401, "INVALID_CREDENTIALS");
   const session = await createSession(user.id);
   return { user: publicUser(user), sessionId: session.id, expiresAt: session.expiresAt };

@@ -9,6 +9,7 @@ import type { ErrorRequestHandler } from "express";
 import { supabase } from "../../config/supabase.js";
 import { getApplicationMode } from "../commercial/application-mode.js";
 import { createBillingOrder, reconcilePaidApplicationStatus } from "../billing/billing.service.js";
+import { findOrder, listOrdersByUser } from "../billing/billing.store.js";
 import { AppError } from "../../core/errors.js";
 
 const BUCKET = "application-documents";
@@ -147,13 +148,24 @@ applicationsRouter.get("/", async (req, res, next) => {
     }
 
     const applications = await applicationStore.listByUser(user.id);
+    const paidApplicationIds = new Set(
+      (await listOrdersByUser(user.id))
+        .filter((order) => order.status === "paid")
+        .map((order) => order.applicationId),
+    );
     await Promise.all(
-      applications.map((application) => reconcilePaidApplicationStatus(user.id, application.id)),
+      applications
+        .filter((application) => paidApplicationIds.has(application.id))
+        .map((application) => reconcilePaidApplicationStatus(user.id, application.id)),
     );
     const refreshedApplications = await applicationStore.listByUser(user.id);
     res.json({
       success: true,
-      data: { applications: refreshedApplications.map(applicationResponse) },
+      data: {
+        applications: refreshedApplications
+          .filter((application) => paidApplicationIds.has(application.id))
+          .map(applicationResponse),
+      },
     });
   } catch (error) {
     next(error);
@@ -180,7 +192,20 @@ applicationsRouter.get("/:id", async (req, res, next) => {
       return;
     }
 
-    res.json({ success: true, data: { application: applicationResponse(application) } });
+    const billing = await findOrder(application.id, user.id);
+    if (billing?.status !== "paid") {
+      res.status(404).json({
+        success: false,
+        error: { code: "APPLICATION_NOT_FOUND", message: "Application not found." },
+      });
+      return;
+    }
+
+    const refreshedApplication = await reconcilePaidApplicationStatus(user.id, application.id);
+    res.json({
+      success: true,
+      data: { application: applicationResponse(refreshedApplication ?? application) },
+    });
   } catch (error) {
     next(error);
   }

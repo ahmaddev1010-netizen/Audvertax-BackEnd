@@ -1,4 +1,6 @@
 import type { Request, Response } from "express";
+import argon2 from "argon2";
+import { z } from "zod";
 import { APPLICATION_STATUSES, type ApplicationStatus } from "../applications/application.types.js";
 import {
   AdminApplicationLifecycleError,
@@ -6,15 +8,68 @@ import {
 } from "./admin.application.service.js";
 import { applicationStore } from "../applications/application.store.js";
 import { userStore } from "../auth/auth.store.js";
-import { findOrder } from "../billing/billing.store.js";
+import { findOrder, listPaidOrders } from "../billing/billing.store.js";
 import { supabase } from "../../config/supabase.js";
+import { AppError } from "../../core/errors.js";
 
 function getParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+const createStaffSchema = z.object({
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  email: z.string().trim().email().max(255),
+  password: z.string().min(6).max(128),
+});
+
+export async function createStaffController(req: Request, res: Response) {
+  const input = createStaffSchema.parse(req.body);
+  const email = input.email.toLowerCase();
+  if (await userStore.findByEmail(email)) {
+    res.status(409).json({
+      success: false,
+      error: { code: "EMAIL_ALREADY_EXISTS", message: "An account with this email already exists." },
+    });
+    return;
+  }
+
+  const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
+  let staff;
+  try {
+    staff = await userStore.create({
+      email,
+      passwordHash,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      role: "staff",
+      authProvider: "password",
+      googleSubject: null,
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "23514") {
+      throw new AppError(
+        "The staff role is not enabled in the database. Run the staff-role migration first.",
+        503,
+        "STAFF_ROLE_NOT_ENABLED",
+      );
+    }
+    throw error;
+  }
+  const { passwordHash: _passwordHash, ...safeStaff } = staff;
+
+  res.status(201).json({ success: true, data: { user: safeStaff } });
+}
+
 export async function listAdminApplicationsController(_req: Request, res: Response) {
-  const applications = await applicationStore.listAll();
+  const isStaff = res.locals.user?.role === "staff";
+  let applications = await applicationStore.listAll();
+  if (isStaff) {
+    const paidApplicationIds = new Set(
+      (await listPaidOrders()).map((order) => order.applicationId),
+    );
+    applications = applications.filter((application) => paidApplicationIds.has(application.id));
+  }
   const users = await Promise.all(
     applications.map((application) => userStore.findById(application.userId)),
   );
@@ -35,6 +90,40 @@ export async function listAdminApplicationsController(_req: Request, res: Respon
   });
 
   res.json({ success: true, data: { applications: data } });
+}
+
+export async function listAdminUsersController(_req: Request, res: Response) {
+  const isStaff = res.locals.user?.role === "staff";
+  let applications = await applicationStore.listAll();
+  if (isStaff) {
+    const paidApplicationIds = new Set(
+      (await listPaidOrders()).map((order) => order.applicationId),
+    );
+    applications = applications.filter((application) => paidApplicationIds.has(application.id));
+  }
+
+  const applicationsByUser = new Map<string, typeof applications>();
+  applications.forEach((application) => {
+    const userApplications = applicationsByUser.get(application.userId) ?? [];
+    userApplications.push(application);
+    applicationsByUser.set(application.userId, userApplications);
+  });
+
+  const users = await Promise.all(
+    [...applicationsByUser.entries()].map(async ([userId, userApplications]) => {
+      const user = await userStore.findById(userId);
+      if (!user) return null;
+      return {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        applications: userApplications,
+      };
+    }),
+  );
+
+  res.json({ success: true, data: { users: users.filter((user) => user !== null) } });
 }
 
 export async function updateAdminApplicationStatusController(req: Request, res: Response) {
@@ -114,8 +203,13 @@ export async function getAdminApplicationController(req: Request, res: Response)
       success: false,
       error: { code: "APPLICATION_NOT_FOUND", message: "Application not found." },
     });
-  const user = await userStore.findById(application.userId);
   const billing = await findOrder(application.id, application.userId);
+  if (res.locals.user?.role === "staff" && billing?.status !== "paid")
+    return res.status(404).json({
+      success: false,
+      error: { code: "APPLICATION_NOT_FOUND", message: "Application not found." },
+    });
+  const user = await userStore.findById(application.userId);
   const documentPaths: string[] = [];
   const collect = (value: unknown) => {
     if (!value || typeof value !== "object") return;

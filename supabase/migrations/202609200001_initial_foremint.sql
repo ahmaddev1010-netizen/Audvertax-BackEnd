@@ -4,7 +4,7 @@ create table if not exists public.users (
   password_hash text,
   first_name text not null,
   last_name text not null,
-  role text not null default 'customer' check (role in ('customer', 'admin')),
+  role text not null default 'customer' check (role in ('customer', 'staff', 'admin')),
   auth_provider text not null default 'password' check (auth_provider in ('password', 'google')),
   google_subject text unique,
   created_at timestamptz not null default now(),

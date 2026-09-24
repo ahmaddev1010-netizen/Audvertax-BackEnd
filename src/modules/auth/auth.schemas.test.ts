@@ -17,7 +17,7 @@ test("register accepts a valid 6-character password", () => {
 test("register rejects passwords shorter than 6 characters", () => {
   const result = registerSchema.safeParse({
     email: "user@example.com",
-    password: "shortpass",
+    password: "short",
     firstName: "Jane",
     lastName: "Doe",
   });
@@ -34,6 +34,7 @@ test("login still permits existing short passwords to be verified", () => {
   const result = loginSchema.safeParse({
     email: "user@example.com",
     password: "shortpass",
+    role: "customer",
   });
 
   assert.equal(result.success, true);

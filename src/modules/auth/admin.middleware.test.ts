@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { requireAdmin } from "./admin.middleware.js";
+import { requireAdmin, requireAdminOrStaff } from "./admin.middleware.js";
 
 function response() {
   let statusCode = 200;
   let payload: unknown;
   return {
-    locals: { user: undefined as { role: "customer" | "admin" } | undefined },
+    locals: { user: undefined as { role: "customer" | "staff" | "admin" } | undefined },
     status(code: number) {
       statusCode = code;
       return this;
@@ -59,6 +59,19 @@ test("requireAdmin permits admin sessions", () => {
   let nextCalled = false;
 
   requireAdmin({} as never, res, () => {
+    nextCalled = true;
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(nextCalled, true);
+});
+
+test("requireAdminOrStaff permits staff sessions", () => {
+  const res = response();
+  res.locals.user = { role: "staff" };
+  let nextCalled = false;
+
+  requireAdminOrStaff({} as never, res, () => {
     nextCalled = true;
   });
 

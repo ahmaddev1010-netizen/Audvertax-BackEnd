@@ -38,6 +38,16 @@ export async function listOrdersByUser(userId: string) {
   return (data as BillingRow[]).map(fromRow);
 }
 
+export async function listPaidOrders() {
+  const { data, error } = await supabase
+    .from("billing_orders")
+    .select("*")
+    .eq("status", "paid")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as BillingRow[]).map(fromRow);
+}
+
 export async function findOrder(applicationId: string, userId: string) {
   const { data, error } = await supabase
     .from("billing_orders")
