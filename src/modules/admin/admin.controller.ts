@@ -29,7 +29,10 @@ export async function createStaffController(req: Request, res: Response) {
   if (await userStore.findByEmail(email)) {
     res.status(409).json({
       success: false,
-      error: { code: "EMAIL_ALREADY_EXISTS", message: "An account with this email already exists." },
+      error: {
+        code: "EMAIL_ALREADY_EXISTS",
+        message: "An account with this email already exists.",
+      },
     });
     return;
   }
