@@ -12,24 +12,24 @@ async function start() {
     const server = app.listen(PORT, HOST, () => {
       logger.info(
         { host: HOST, port: PORT, url: `http://localhost:${PORT}` },
-        "Foremint API running",
+        "Audvertax API running",
       );
     });
 
     server.on("error", (error) => {
-      logger.error({ err: error }, "Foremint API failed to start");
+      logger.error({ err: error }, "Audvertax API failed to start");
       process.exitCode = 1;
     });
 
     const shutdown = (signal: string) => {
-      logger.info({ signal }, "Shutting down Foremint API");
+      logger.info({ signal }, "Shutting down Audvertax API");
       server.close(() => process.exit(0));
     };
 
     process.once("SIGINT", () => shutdown("SIGINT"));
     process.once("SIGTERM", () => shutdown("SIGTERM"));
   } catch (error) {
-    logger.error({ err: error }, "Foremint API failed database startup check");
+    logger.error({ err: error }, "Audvertax API failed database startup check");
     process.exitCode = 1;
   }
 }

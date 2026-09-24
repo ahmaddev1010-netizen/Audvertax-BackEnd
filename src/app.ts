@@ -60,7 +60,7 @@ app.use("/api/v1/admin", (_req, res, next) => {
 });
 
 app.get("/", (_req, res) => {
-  res.json({ success: true, data: { name: "Foremint API", status: "running" } });
+  res.json({ success: true, data: { name: "Audvertax API", status: "running" } });
 });
 
 app.get("/api/v1/health", async (_req, res) => {
