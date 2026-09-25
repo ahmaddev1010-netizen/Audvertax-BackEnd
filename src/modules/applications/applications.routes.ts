@@ -148,10 +148,9 @@ applicationsRouter.get("/", async (req, res, next) => {
     }
 
     const applications = await applicationStore.listByUser(user.id);
+    const orders = await listOrdersByUser(user.id);
     const paidApplicationIds = new Set(
-      (await listOrdersByUser(user.id))
-        .filter((order) => order.status === "paid")
-        .map((order) => order.applicationId),
+      orders.filter((order) => order.status === "paid").map((order) => order.applicationId),
     );
     await Promise.all(
       applications
@@ -162,9 +161,7 @@ applicationsRouter.get("/", async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        applications: refreshedApplications
-          .filter((application) => paidApplicationIds.has(application.id))
-          .map(applicationResponse),
+        applications: refreshedApplications.map(applicationResponse),
       },
     });
   } catch (error) {
@@ -185,15 +182,6 @@ applicationsRouter.get("/:id", async (req, res, next) => {
 
     const application = await applicationStore.findById(req.params.id);
     if (!application || application.userId !== user.id) {
-      res.status(404).json({
-        success: false,
-        error: { code: "APPLICATION_NOT_FOUND", message: "Application not found." },
-      });
-      return;
-    }
-
-    const billing = await findOrder(application.id, user.id);
-    if (billing?.status !== "paid") {
       res.status(404).json({
         success: false,
         error: { code: "APPLICATION_NOT_FOUND", message: "Application not found." },
