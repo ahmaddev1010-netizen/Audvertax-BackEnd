@@ -1,8 +1,15 @@
 import type { Request, Response } from "express";
-import { forgotPasswordSchema, googleSchema, loginSchema, registerSchema } from "./auth.schemas.js";
+import {
+  changePasswordSchema,
+  forgotPasswordSchema,
+  googleSchema,
+  loginSchema,
+  registerSchema,
+} from "./auth.schemas.js";
 import { z } from "zod";
 import {
   forgotPassword,
+  changePassword,
   getUserFromSession,
   login,
   loginWithGoogle,
@@ -36,6 +43,11 @@ export async function googleLoginUser(req: Request, res: Response) {
 }
 export async function forgotPasswordUser(req: Request, res: Response) {
   const result = await forgotPassword(forgotPasswordSchema.parse(req.body));
+  res.json({ success: true, data: result });
+}
+export async function changePasswordUser(req: Request, res: Response) {
+  const user = res.locals.user as { id: string };
+  const result = await changePassword(user.id, changePasswordSchema.parse(req.body));
   res.json({ success: true, data: result });
 }
 export async function resetPasswordUser(req: Request, res: Response) {

@@ -9,6 +9,7 @@ import type {
   GoogleInput,
   LoginInput,
   RegisterInput,
+  ChangePasswordInput,
 } from "./auth.schemas.js";
 import type { PublicUser, User } from "./auth.types.js";
 
@@ -157,6 +158,25 @@ export async function forgotPassword(input: ForgotPasswordInput) {
     message: "Password reset instructions have been created.",
     resetToken: env.NODE_ENV === "production" ? undefined : rawToken,
   };
+}
+
+export async function changePassword(userId: string, input: ChangePasswordInput) {
+  const user = await userStore.findById(userId);
+  if (!user?.passwordHash) {
+    throw new AppError(
+      "This account does not have a password. Use Google sign-in instead.",
+      400,
+      "PASSWORD_LOGIN_NOT_AVAILABLE",
+    );
+  }
+
+  if (!(await argon2.verify(user.passwordHash, input.currentPassword))) {
+    throw new AppError("Current password is incorrect.", 401, "INVALID_CURRENT_PASSWORD");
+  }
+
+  const passwordHash = await argon2.hash(input.newPassword, { type: argon2.argon2id });
+  await userStore.update(userId, { passwordHash });
+  return { message: "Your password has been changed successfully." };
 }
 
 export async function resetPassword(token: string, newPassword: string) {
