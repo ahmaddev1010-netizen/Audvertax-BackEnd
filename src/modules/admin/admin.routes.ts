@@ -8,6 +8,7 @@ import {
   createStaffController,
   listStaffController,
   removeStaffController,
+  updateUserPaymentStatusController,
   updateAdminApplicationStatusController,
 } from "./admin.controller.js";
 
@@ -18,6 +19,7 @@ adminRoutes.post("/staff", requireAdmin, createStaffController);
 adminRoutes.get("/staff", requireAdmin, listStaffController);
 adminRoutes.delete("/staff/:id", requireAdmin, removeStaffController);
 adminRoutes.get("/users", listAdminUsersController);
+adminRoutes.patch("/users/:id/payment-status", updateUserPaymentStatusController);
 adminRoutes.get("/applications", listAdminApplicationsController);
 adminRoutes.get("/applications/:id", getAdminApplicationController);
 adminRoutes.patch("/applications/:id/status", requireAdmin, updateAdminApplicationStatusController);

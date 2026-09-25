@@ -8,7 +8,7 @@ import {
 } from "./admin.application.service.js";
 import { applicationStore } from "../applications/application.store.js";
 import { userStore } from "../auth/auth.store.js";
-import { findOrder, listPaidOrders } from "../billing/billing.store.js";
+import { findOrder, listOrdersByUser, listPaidOrders, updateOrder } from "../billing/billing.store.js";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../core/errors.js";
 
@@ -157,6 +157,59 @@ export async function listAdminUsersController(_req: Request, res: Response) {
   res.json({ success: true, data: { users: users.filter((user) => user !== null) } });
 }
 
+export async function updateUserPaymentStatusController(req: Request, res: Response) {
+  const userId = getParam(req.params.id);
+  const body = req.body as { status?: string };
+
+  if (!userId) {
+    res.status(400).json({
+      success: false,
+      error: { code: "INVALID_USER_ID", message: "User ID is required." },
+    });
+    return;
+  }
+
+  if (body.status !== "paid") {
+    res.status(400).json({
+      success: false,
+      error: { code: "INVALID_PAYMENT_STATUS", message: "Only the paid status is supported." },
+    });
+    return;
+  }
+
+  const user = await userStore.findById(userId);
+  if (!user) {
+    res.status(404).json({
+      success: false,
+      error: { code: "USER_NOT_FOUND", message: "User not found." },
+    });
+    return;
+  }
+
+  const orders = await listOrdersByUser(userId);
+  const pendingOrders = orders.filter((order) => order.status === "pending");
+  if (!pendingOrders.length) {
+    res.status(404).json({
+      success: false,
+      error: { code: "PAYMENT_NOT_FOUND", message: "No pending payment was found for this user." },
+    });
+    return;
+  }
+
+  for (const order of pendingOrders) {
+    await updateOrder(order.id, { status: "paid" });
+    const application = await applicationStore.findById(order.applicationId);
+    if (application && application.userId === userId) {
+      await applicationStore.update(application.id, { status: "paid" });
+    }
+  }
+
+  res.json({
+    success: true,
+    data: { status: "paid", updatedOrders: pendingOrders.length },
+  });
+}
+
 export async function updateAdminApplicationStatusController(req: Request, res: Response) {
   const applicationId = getParam(req.params.id);
   const body = req.body as {
@@ -222,7 +275,7 @@ export async function updateAdminApplicationStatusController(req: Request, res: 
 }
 
 export async function getAdminApplicationController(req: Request, res: Response) {
-  const applicationId = getParam(req.params.id);
+  const applicationId = getParam(req.params.id ?? req.params.applicationId);
   if (!applicationId)
     return res.status(400).json({
       success: false,
