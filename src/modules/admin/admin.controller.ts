@@ -64,6 +64,34 @@ export async function createStaffController(req: Request, res: Response) {
   res.status(201).json({ success: true, data: { user: safeStaff } });
 }
 
+export async function listStaffController(_req: Request, res: Response) {
+  const staff = await userStore.listByRole("staff");
+  res.json({
+    success: true,
+    data: {
+      staff: staff.map(({ passwordHash: _passwordHash, ...safeStaff }) => safeStaff),
+    },
+  });
+}
+
+export async function removeStaffController(req: Request, res: Response) {
+  const staffId = getParam(req.params.id);
+  const staff = staffId ? await userStore.findById(staffId) : null;
+  if (!staff || staff.role !== "staff") {
+    res.status(404).json({
+      success: false,
+      error: { code: "STAFF_NOT_FOUND", message: "Staff account not found." },
+    });
+    return;
+  }
+
+  await userStore.update(staff.id, { role: "customer" });
+  res.json({
+    success: true,
+    data: { message: "Staff account removed successfully." },
+  });
+}
+
 export async function listAdminApplicationsController(_req: Request, res: Response) {
   const isStaff = res.locals.user?.role === "staff";
   let applications = await applicationStore.listAll();

@@ -11,6 +11,7 @@ import { applicationsRouter } from "./modules/applications/applications.routes.j
 import { billingRoutes } from "./modules/billing/billing.routes.js";
 import { stripeWebhookController } from "./modules/billing/billing.controller.js";
 import { adminRoutes } from "./modules/admin/admin.routes.js";
+import { staffRoutes } from "./modules/staff/staff.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { supabase } from "./config/supabase.js";
 
@@ -84,6 +85,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/applications", applicationsRouter);
 app.use("/api/v1/billing", billingRoutes);
 app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/staff", staffRoutes);
 
 app.use((_req, res) => {
   res

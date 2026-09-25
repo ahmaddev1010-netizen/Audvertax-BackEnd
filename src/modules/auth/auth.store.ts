@@ -69,6 +69,16 @@ export const userStore = {
     return data ? fromUserRow(data as UserRow) : null;
   },
 
+  async listByRole(role: User["role"]) {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("role", role)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data as UserRow[]).map(fromUserRow);
+  },
+
   async create(data: Omit<User, "id" | "createdAt" | "updatedAt">) {
     const now = new Date().toISOString();
     const { data: created, error } = await supabase
